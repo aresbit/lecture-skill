@@ -1,5 +1,5 @@
 ---
-name: cs-lecture-learn
+name: lecture-skill
 description: |
   CS 课程系统性学习 Skill。融合横纵分析法与结构化写作质检体系，用于深度学习一门计算机科学课程（含 lecture notes、syllabus、paper list），最终输出一份结构完整、有个人洞察的学习报告。
   触发词包括但不限于：学习这门课、帮我梳理一下这个课程、研究一下这门 CS 课程、输出学习报告、课程分析、lecture notes 整理、帮我搞懂这门课。
