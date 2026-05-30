@@ -11,6 +11,37 @@ description: |
 
 你正在执行一次 CS 课程的系统性深度学习，最终产出一份**结构完整、有个人洞察的学习报告**。
 
+## 输入源说明
+
+本 Skill 支持两种主要的课程材料获取方式：
+
+### 联网获取（Web）
+
+通过 WebSearch + WebFetch 获取课程主页、syllabus、在线 lecture notes、公开课页面等。适用于材料完全在线的课程。
+
+### 本地 PDF 阅读（新能力）
+
+Claude Code 的 Read 工具现已原生支持 PDF 阅读（基于 liteparse 文本提取），可以直接读取本地 PDF 文件作为输入源。适用场景：
+
+- **本地 lecture notes/slides PDF**：教授提供的课程讲义 PDF
+- **学术论文 PDF**：从 arXiv 等下载的论文全文
+- **教材章节 PDF**：扫描或电子版教材的部分章节
+- **syllabus PDF**：课程大纲的 PDF 版本
+
+**PDF 阅读技术要点**：
+- Read 工具对 PDF 使用 `pages` 参数指定页码范围，如 `pages: "1-5"` 读取前 5 页
+- 单次最多读取 20 页，大 PDF 需分批次读取（如 1-20, 21-40, ...）
+- PDF 中的图表、公式可能提取不完整，关键公式建议交叉验证原始论文或教材
+- 对于扫描版 PDF（图片型），文本提取效果有限，优先寻找可搜索的文本型 PDF
+
+**PDF + Web 组合工作流**（推荐用于论文密集型课程）：
+1. 在 arXiv / Google Scholar 上发现关键论文
+2. 下载 PDF 到本地工作目录
+3. 使用 Read 工具定向读取论文的特定章节（Abstract、Methodology、Experiments）
+4. 将提取的关键信息整合进纵轴分析
+
+---
+
 ## 核心方法论
 
 本 Skill 的核心原则是：**纵向追知识深度，横向追资源广度，交汇出学习策略与个人洞察**。
@@ -32,61 +63,82 @@ description: |
 3. **开课院校与教授**：如 Brown University, Prof. XXX
 4. **特别关注点**（可选）：用户是否有特定想深入的方向？如 "重点帮我看 project 部分"、"我想知道前置知识要求"
 
-### 环境检查
+### 材料来源检查
 
+**本地 PDF 材料**（优先检查）：
+- 询问用户是否有课程相关的本地 PDF 文件（lecture notes、syllabus、papers、教材）
+- 如有，记录 PDF 路径和大致页数，规划分页读取策略（每批 ≤20 页）
+- 优先处理文本型 PDF（可搜索），扫描版 PDF 需提醒用户文本提取质量可能受限
+
+**在线材料**：
+- 确认课程主页 URL 可访问
+- 检查是否有 web-access skill 可用（路径 `/mnt/.claude/skills/web-access/SKILL.md`），优先使用其浏览器 CDP 能力获取课程页面中的动态内容
+
+**PDF 输出能力检查**：
 - 检查 PDF 转换脚本是否可用（本 Skill 自带 `scripts/md_to_pdf.py`，基于 WeasyPrint）。依赖安装命令：`pip install weasyprint markdown --break-system-packages`
-- 检查是否有 web-access skill 可用（路径 `/mnt/.claude/skills/web-access/SKILL.md`），优先使用其浏览器 CDP 能力获取课程页面中的动态内容。
 
 ---
 
-## 第一步：联网信息收集
+## 第一步：信息收集
 
-研究报告的质量取决于信息的丰富度和准确性。**必须联网搜索**，不能仅靠已有知识。
+研究报告的质量取决于信息的丰富度和准确性。**必须联网搜索**，不能仅靠已有知识。如有本地 PDF 材料，必须与在线信息交叉验证。
 
 ### 并行搜索策略
 
 使用子 Agent 并行搜索提高效率。建议分工：
 
 - **子 Agent 1 — 课程纵轴信息**：
-  - 用 WebFetch 完整抓取课程 syllabus、lecture notes、schedule、reading list
+  - **在线**：用 WebFetch 完整抓取课程 syllabus、lecture notes、schedule、reading list
+  - **本地**：使用 Read 工具读取本地 PDF lecture notes / syllabus（每批 ≤20 页，大文件分页读取）
   - 提取每周主题、核心概念、必读 paper、assignment/project 设计
   - 调研该课程涉及的核心技术/概念的起源与发展（关键论文、里程碑版本、算法迭代）
+  - PDF 是 lecture notes 的一手来源，优先级高于网页摘要
 
 - **子 Agent 2 — 课程横轴信息**：
   - 搜索同类课程：同一主题在 MIT/Stanford/CMU/Berkeley 等校的课程编号与 syllabus
   - 搜索该课程的替代学习资源：经典教材、YouTube 公开课、OCW、著名 blog/tutorial
   - 搜索该教授的学术背景和研究方向（帮助理解课程视角）
 
-- **子 Agent 3 — 社区与口碑**（复杂课程才需要）：
+- **子 Agent 3 — 论文精读**（论文密集型课程必需）：
+  - 根据课程 reading list，在 arXiv / Google Scholar 上搜索关键论文
+  - 下载论文 PDF 到本地工作目录
+  - 使用 Read 工具定向读取论文的 Abstract、Introduction、Methodology、关键图表
+  - 记录每篇论文的核心贡献、与课程主题的关联点
+  - 大论文（>20 页）只精读核心章节，其余部分略读
+
+- **子 Agent 4 — 社区与口碑**（复杂课程才需要）：
   - 搜索学生对这门课的评价（Reddit、知乎、Course Hero、GitHub 上的 project 实现）
   - 搜索该课程的历年考试/作业难度讨论
 
-**子 Agent 联网工具使用指南**（写入每个子 Agent 的 prompt）：
+**子 Agent 联网与 PDF 工具使用指南**（写入每个子 Agent 的 prompt）：
 
-> 你需要联网获取信息。使用以下工具：
+> 你需要联网获取信息并可能阅读 PDF 材料。使用以下工具：
 > - **WebSearch**：用于搜索发现信息来源
 > - **WebFetch**：当已知具体 URL 时，定向提取页面内容
+> - **Read**：读取本地 PDF 文件。使用 `pages` 参数指定页码范围（如 `pages: "1-5"`），单次最多 20 页。大文件分批次读取。对于论文，优先读 Abstract → Introduction → Conclusion → 核心方法章节
 > - 如果环境中安装了 web-access skill，优先加载它并遵循其指引
 > - 搜索策略：先用 WebSearch 发现线索，找到具体 URL 后用 WebFetch 深入提取
 > - 多次搜索、多个关键词组合，不要只搜一次就放弃
-> - 一手来源优于二手来源：课程官方页面 > 教授个人主页 > 权威学术资源 > 社区讨论
-> - **学术类内容必查 arXiv/Google Scholar**：如果课程涉及论文，通过 arXiv API 或 Scholar 获取相关论文信息
+> - 一手来源优于二手来源：课程官方页面 > PDF lecture notes > 教授个人主页 > 权威学术资源 > 社区讨论
+> - **学术类内容必查 arXiv/Google Scholar**：如果课程涉及论文，通过 arXiv 获取论文 PDF，再用 Read 工具精读
 
 ### 信息来源优先级
 
-| 信息类型 | 一手来源 |
-|---------|---------|
-| 课程安排/阅读材料 | 课程官方 syllabus、lecture notes |
-| 教授研究方向 | 教授个人主页、Google Scholar、DBLP |
-| 技术/概念原理 | 原始论文（arXiv、ACM DL、IEEE）、经典教材 |
-| 学生口碑 | Reddit r/csMajors、知乎、GitHub Issues/Projects |
-| 同类课程对比 | 各校官方课程页面、OCW |
+| 信息类型 | 一手来源 | PDF 来源 |
+|---------|---------|---------|
+| 课程安排/阅读材料 | 课程官方 syllabus 页面 | 本地 syllabus PDF |
+| 课堂讲义/知识点 | 在线 lecture notes | **本地 lecture notes PDF**（优先，内容最完整） |
+| 教授研究方向 | 教授个人主页、Google Scholar、DBLP | 教授发表的论文 PDF |
+| 技术/概念原理 | 原始论文（arXiv、ACM DL、IEEE）、经典教材 | **下载的论文 PDF**（配合 Read 工具精读） |
+| 学生口碑 | Reddit r/csMajors、知乎、GitHub Issues/Projects | — |
+| 同类课程对比 | 各校官方课程页面、OCW | 其他课程的 lecture notes PDF |
 
 ### 信息充分性自检
 
 - 纵轴：能梳理出该课程每周的知识建构逻辑吗？核心概念的历史演进清楚吗？
 - 横轴：同类课程列表完整吗？有没有遗漏该领域的标杆课程？
-- 来源：关键事实有可靠来源支撑吗？有没有只靠单一来源就下判断的？
+- PDF：本地 PDF 材料是否已按页分批读取？arxiv 论文的核心章节是否已精读？
+- 来源：关键事实有可靠来源支撑吗？有没有只靠单一来源就下判断的？PDF 中的信息是否与在线信息交叉验证过？
 
 信息不够就再补搜，不要凑合。
 
@@ -267,9 +319,10 @@ description: |
 - [ ] 核心概念的历史演进有足够深度？
 - [ ] 横轴对比了至少 2-3 个同类顶级课程或资源？
 - [ ] 对比维度覆盖了教学设计、内容侧重、资源可及性？
+- [ ] PDF 材料（如有）是否已充分读取并整合？论文核心章节是否已精读？
 - [ ] 交汇洞察给出了具体可执行的学习建议，而非前面内容的缩写？
 - [ ] 最优学习路径、难点预警、资源互补方案都覆盖到了？
 - [ ] 写作风格有节奏感、有可读性？不是冷冰冰的 syllabus 摘要？
 - [ ] 没有触犯绝对禁区里的任何一条？
-- [ ] 所有关键事实标注了信息来源？
+- [ ] 所有关键事实标注了信息来源（区分在线来源和 PDF 来源）？
 - [ ] 搜不到的信息诚实标注了"暂缺"，没有编造？
